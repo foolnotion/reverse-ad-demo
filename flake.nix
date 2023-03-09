@@ -24,17 +24,20 @@
         devShells.default = stdenv_.mkDerivation {
           name = "reverse-ad";
 
-          nativeBuildInputs = operon.nativeBuildInputs ++ (with pkgs; [
+          nativeBuildInputs = with pkgs; [
             cmake
             ninja
             clang-tools
+            codespell
             cppcheck
             include-what-you-use
-          ]);
+          ];
 
           buildInputs = with pkgs; [
             # dependencies
             eigen
+            xxhash_cpp
+            unordered_dense
 
             # debugging and profiling
             gdb

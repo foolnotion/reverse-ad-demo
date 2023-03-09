@@ -14,10 +14,13 @@ if(PROJECT_IS_TOP_LEVEL)
 endif()
 
 # ---- Tests ----
-
 add_executable(reverse-ad-demo_test source/reverse-ad-demo_test.cpp)
 target_link_libraries(reverse-ad-demo_test PRIVATE reverse-ad-demo::reverse-ad-demo)
 target_compile_features(reverse-ad-demo_test PRIVATE cxx_std_20)
+
+message(STATUS "project source dir: ${PROJECT_SOURCE_DIR}")
+message(STATUS "cmake source dir: ${CMAKE_SOURCE_DIR}")
+target_include_directories(reverse-ad-demo_test PRIVATE ${CMAKE_SOURCE_DIR})
 
 add_test(NAME reverse-ad-demo_test COMMAND reverse-ad-demo_test)
 

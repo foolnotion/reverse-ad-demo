@@ -3,6 +3,8 @@
 # misc-non-private-member-variables-in-classes: the options don't do anything
 # modernize-use-nodiscard: too aggressive, attribute is situationally useful
 Checks: "*,\
+  -readability-identifier-naming,
+  -readability-identifier-length,
   -google-readability-todo,\
   -altera-*,\
   -fuchsia-*,\

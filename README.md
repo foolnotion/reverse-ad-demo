@@ -1,6 +1,6 @@
 # reverse-ad-demo
 
-This is the reverse-ad-demo project.
+This is a minimal implementation of reverse-mode automatic differentiation, only used to illustrate key concepts.
 
 # Building and installing
 
