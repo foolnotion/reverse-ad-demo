@@ -7,8 +7,12 @@
 #include "ext/boost/ut.hpp"
 #include "reverse-ad-demo/expr.hpp"
 
-struct thurber_cost_func
+namespace reverse::test
 {
+
+struct thurber_functor
+{
+    // see https://www.itl.nist.gov/div898/strd/nls/data/thurber.shtml
     using Scalar = double;
 
     // required by Eigen::LevenbergMarquardt
@@ -30,88 +34,117 @@ struct thurber_cost_func
                                       1442.962, 1464.350, 1468.705, 1447.894, 1457.628};
 
     [[nodiscard]] auto values() const -> int { return xval.size(); }  // NOLINT
-    [[nodiscard]] auto inputs() const -> int { return start1.size(); }  //
+    [[nodiscard]] auto inputs() const -> int { return start1.size(); }  // NOLINT
 
     auto operator()(Eigen::Matrix<Scalar, -1, 1> const& input, Eigen::Matrix<Scalar, -1, 1>& residual) const -> int
     {
-        reverse::Tape<double> tape;
-        std::vector<decltype(tape)::Variable> beta;
-
-        for (auto i = 0; i < xval.size(); ++i) {
-            tape.clear();
-            beta.clear();
-            std::transform(
-                input.begin(), input.end(), std::back_inserter(beta), [&](auto v) { return tape.variable(v); });
-
-            auto x = xval.at(i);
-            auto xx = x * x;
-            auto xxx = x * x * x;
-
-            auto f = (beta[0] + beta[1] * x + beta[2] * xx + beta[3] * xxx)
-                / (1 + beta[4] * x + beta[5] * xx + beta[6] * xxx);
-
-            residual(i) = f.value - yval.at(i);
-        }
-        return 0;
+        return (*this)(input, residual.data(), static_cast<Scalar*>(nullptr));
     }
 
     auto df(Eigen::Matrix<Scalar, -1, 1> const& input, Eigen::Matrix<Scalar, -1, -1>& jacobian) const -> int  // NOLINT
     {
-        assert(jacobian.rows() == values());
-        assert(jacobian.cols() == inputs());
+        return (*this)(input, static_cast<Scalar*>(nullptr), jacobian.data());
+    }
 
+  private:
+    auto operator()(Eigen::Matrix<Scalar, -1, 1> const& input, auto* residual, auto* jacobian) const -> int  // NOLINT
+    {
         reverse::Tape<double> tape;
         std::vector<decltype(tape)::Variable> beta;
 
-        for (auto i = 0; i < xval.size(); ++i) {
+        for (auto i = 0; i < std::ssize(xval); ++i) {
             tape.clear();
             beta.clear();
             std::transform(
                 input.begin(), input.end(), std::back_inserter(beta), [&](auto v) { return tape.variable(v); });
 
-            auto x = xval.at(i);
+            auto x = xval.at(static_cast<std::size_t>(i));
             auto xx = x * x;
             auto xxx = x * x * x;
 
             auto f = (beta[0] + beta[1] * x + beta[2] * xx + beta[3] * xxx)
-                / (1 + beta[4] * x + beta[5] * xx + beta[6] * xxx);
+                / (1 + beta[4] * x + beta[5] * xx + beta[6] * xxx);  // NOLINT
 
-            auto g = f.gradient();
+            if (residual != nullptr) {
+                residual[i] = f.value - yval.at(static_cast<std::size_t>(i));  // NOLINT
+            }
 
-            for (auto const& b : beta) {
-                jacobian(i, static_cast<Eigen::Index>(b.index)) = g.wrt(b);
+            if (jacobian != nullptr) {
+                auto g = f.gradient();
+                for (auto const& b : beta) {
+                    jacobian[values() * b.index + i] = g.wrt(b);  // NOLINT
+                }
             }
         }
         return 0;
     }
 };
 
+class approximately_equal
+{
+    double eps_;
+
+  public:
+    explicit approximately_equal(double epsilon)
+        : eps_(epsilon)
+    {
+    }
+
+    auto operator()(Arithmetic auto a, Arithmetic auto b) { return std::abs(a - b) < eps_; }
+};
+
 boost::ut::suite const nonlinear_least_squares_test_suite = []
 {
     using namespace boost::ut;  // NOLINT
-    using Tape = reverse::Tape<double>;
 
     "thurber"_test = [&]
     {
-        thurber_cost_func cost_function;
-        Eigen::LevenbergMarquardt<thurber_cost_func> lm(cost_function);
-        lm.setMaxfev(50);  // NOLINT
-        Eigen::VectorXd x0 =
-            Eigen::Map<decltype(x0) const>(thurber_cost_func::start1.data(), thurber_cost_func::start1.size());
-        Eigen::LevenbergMarquardtSpace::Status status = lm.minimizeInit(x0);
+        auto constexpr tol {1.E4 * std::numeric_limits<double>::epsilon()};
+        auto constexpr max_fun_eval {50};
 
-        std::cout << "initial cost: " << lm.fnorm() * lm.fnorm() << ", initial parameters: " << x0.transpose() << "\n";
-        if (status != Eigen::LevenbergMarquardtSpace::ImproperInputParameters) {
-            auto k {0};
-            do {
-                status = lm.minimizeOneStep(x0);
-                std::cout << "iter " << (++k) << "\t\tnorm = " << lm.fnorm() * lm.fnorm() << "\n";
-            } while (status == Eigen::LevenbergMarquardtSpace::Running);
-        } else {
-            throw std::runtime_error("improper input parameters\n");
+        // try first starting point
+        auto s1 = thurber_functor::start1;
+        Eigen::VectorXd x = Eigen::Map<decltype(x) const>(s1.data(), std::ssize(s1));
+
+        thurber_functor cost_function;
+        Eigen::LevenbergMarquardt<thurber_functor> lm(cost_function);
+        Eigen::LevenbergMarquardtSpace::Status status {};
+        lm.setMaxfev(max_fun_eval);
+        lm.setFtol(tol);
+        lm.setXtol(tol);
+        status = lm.minimize(x);
+
+        auto constexpr expected_norm {5.6427082397E+03};
+        std::array constexpr expected_x {1.2881396800E+03,
+                                         1.4910792535E+03,
+                                         5.8323836877E+02,
+                                         7.5416644291E+01,
+                                         9.6629502864E-01,
+                                         3.9797285797E-01,
+                                         4.9727297349E-02};
+
+        auto constexpr eps {1e-4};
+        expect(approximately_equal {eps}(lm.fvec().squaredNorm(), expected_norm));
+        for (auto i = 0; i < x.size(); ++i) {
+            expect(approximately_equal {eps}(x[i], expected_x.at(static_cast<std::size_t>(i))));
         }
-        std::cout << "final cost: " << lm.fnorm() * lm.fnorm() << ", final parameters: " << x0.transpose() << "\n";
+
+        // try second starting point
+        auto s2 = thurber_functor::start2;
+        x = Eigen::Map<decltype(x) const>(s2.data(), std::ssize(s2));
+        lm.resetParameters();
+        lm.setMaxfev(max_fun_eval);  // NOLINT
+        lm.setFtol(tol);
+        lm.setXtol(tol);
+        status = lm.minimize(x);
+
+        expect(approximately_equal {eps}(lm.fvec().squaredNorm(), expected_norm));
+        for (auto i = 0; i < x.size(); ++i) {
+            expect(approximately_equal {eps}(x[i], expected_x.at(static_cast<std::size_t>(i))));
+        }
     };
 };
+
+}  // namespace reverse::test
 
 #endif
