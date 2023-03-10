@@ -74,6 +74,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Install runtime deps
+      run: sudo apt-get install libeigen3-dev -y -q
+
     - name: Configure
       env: { CXX: clang++-14 }
       run: cmake --preset=ci-sanitize
@@ -113,6 +116,16 @@ jobs:
         /usr/bin/clang-tidy clang-tidy
         /usr/bin/clang-tidy-14 140
 
+    - name: Install runtime dependencies ubuntu-22.04
+      if: matrix.os == 'ubuntu-22.04'
+      run: >-
+        sudo apt-get install libeigen3-dev -y -q
+
+    - name: Install runtime dependencies macos-12
+      if: matrix.os == 'macos-12'
+      run: >-
+        brew install eigen
+
     - name: Setup MultiToolTask
       if: matrix.os == 'windows-2022'
       run: |
@@ -131,7 +144,7 @@ jobs:
 
     - name: Test
       working-directory: build
-      run: ctest --output-on-failure --no-tests=error -C Release -j 2
+      run: ctest --output-on-failure --no-tests=error -C Release -j 1
 
   docs:
     # Deploy docs only when builds succeed
