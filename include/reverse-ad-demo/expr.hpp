@@ -30,8 +30,9 @@ struct Var;
 template<Arithmetic T>
 struct Tape
 {
-    using node_t = Node<T>;
-    std::vector<node_t> nodes;
+    using Scalar = T;
+    using Variable = Var<T>;
+    std::vector<Node<T>> nodes;
 
     auto push() -> std::size_t
     {

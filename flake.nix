@@ -31,6 +31,7 @@
             codespell
             cppcheck
             include-what-you-use
+            gcc12
           ];
 
           buildInputs = with pkgs; [
