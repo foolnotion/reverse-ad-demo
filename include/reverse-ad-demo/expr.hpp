@@ -57,7 +57,7 @@ struct Tape
 
     auto length() const -> std::size_t { return std::size(nodes); }
 
-    auto variable(T value) { return Var<T>{*this, value, push()}; }
+    auto variable(T value) { return Var<T> {*this, value, push()}; }
 
     auto clear() { nodes.clear(); }
 };

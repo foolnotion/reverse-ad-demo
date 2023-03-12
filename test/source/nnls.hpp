@@ -51,7 +51,9 @@ struct thurber_functor
     {
         reverse::Tape<Scalar> tape;
         std::vector<decltype(tape)::Variable> beta;
-        for (auto v : input) { beta.push_back(tape.variable(v)); }
+        for (auto v : input) {
+            beta.push_back(tape.variable(v));
+        }
 
         for (auto i = 0; i < std::ssize(xval); ++i) {
             tape.nodes.resize(input.size());
