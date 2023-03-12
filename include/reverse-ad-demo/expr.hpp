@@ -20,7 +20,7 @@ template<Arithmetic T>
 struct Node
 {
     std::array<T, 2> partials {T {0}, T {0}};  // partial derivative values
-    std::array<std::size_t, 2> parents {0, 0};  // indices of parent nodes
+    std::array<std::size_t, 2> inputs {0, 0};  // indices of input nodes
 };
 
 // forward declaration
@@ -57,11 +57,7 @@ struct Tape
 
     auto length() const -> std::size_t { return std::size(nodes); }
 
-    auto variable(T value)
-    {
-        Var<T> v {*this, value, push()};
-        return v;
-    }
+    auto variable(T value) { return Var<T>{*this, value, push()}; }
 
     auto clear() { nodes.clear(); }
 };
@@ -92,8 +88,8 @@ struct Var
             auto const& n = tape.nodes[i];
             auto d = grad[i];
 
-            for (auto j = 0UL; j < std::size(n.parents); ++j) {
-                grad[n.parents[j]] += n.partials[j] * d;
+            for (auto j = 0UL; j < std::size(n.inputs); ++j) {
+                grad[n.inputs[j]] += n.partials[j] * d;
             }
         }
 

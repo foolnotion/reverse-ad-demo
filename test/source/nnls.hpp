@@ -47,16 +47,17 @@ struct thurber_functor
     }
 
   private:
-    auto operator()(Eigen::Matrix<Scalar, -1, 1> const& input, auto* residual, auto* jacobian) const -> int  // NOLINT
+    auto operator()(auto const& input, auto* residual, auto* jacobian) const -> int  // NOLINT
     {
-        reverse::Tape<double> tape;
+        reverse::Tape<Scalar> tape;
         std::vector<decltype(tape)::Variable> beta;
+        for (auto v : input) { beta.push_back(tape.variable(v)); }
 
         for (auto i = 0; i < std::ssize(xval); ++i) {
-            tape.clear();
-            beta.clear();
-            std::transform(
-                input.begin(), input.end(), std::back_inserter(beta), [&](auto v) { return tape.variable(v); });
+            tape.nodes.resize(input.size());
+            for (auto j = 0; j < input.size(); ++j) {
+                beta[j].value = input[j];
+            }
 
             auto x = xval.at(static_cast<std::size_t>(i));
             auto xx = x * x;

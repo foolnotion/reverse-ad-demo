@@ -2,6 +2,8 @@
 
 This is a minimal implementation of reverse-mode automatic differentiation, only used to illustrate key concepts.
 
+The code you see here is largely inspired from https://github.com/Rufflewind/revad with some additional flexibility, derivation rules, unit tests etc.
+
 # Building and installing
 
 See the [BUILDING](BUILDING.md) document.
