@@ -1,6 +1,8 @@
 #ifndef REVERSE_AD_DEMO_TEST_NNLS_HPP
 #define REVERSE_AD_DEMO_TEST_NNLS_HPP
 
+#include <iostream>
+
 #include <Eigen/Core>
 #include <unsupported/Eigen/LevenbergMarquardt>
 
@@ -96,56 +98,77 @@ class approximately_equal
     auto operator()(Arithmetic auto a, Arithmetic auto b) { return std::abs(a - b) < eps_; }
 };
 
-boost::ut::suite const nonlinear_least_squares_test_suite = []
+static auto test_thurber()
+{
+    auto constexpr tol {1.E4 * std::numeric_limits<double>::epsilon()};
+    auto constexpr max_fun_eval {50};
+
+    // try first starting point
+    auto s1 = thurber_functor::start1;
+    Eigen::VectorXd x = Eigen::Map<decltype(x) const>(s1.data(), std::ssize(s1));
+
+    thurber_functor cost_function;
+    Eigen::LevenbergMarquardt<thurber_functor> lm(cost_function);
+    Eigen::LevenbergMarquardtSpace::Status status {};
+    lm.setMaxfev(max_fun_eval);
+    lm.setFtol(tol);
+    lm.setXtol(tol);
+
+    std::cout << "starting optimization from x0 = " << x.transpose() << "\n";
+    auto iteration = 1;
+    status = lm.minimizeInit(x);
+    if (status != Eigen::LevenbergMarquardtSpace::ImproperInputParameters) {
+        while ((status = lm.minimizeOneStep(x)) == Eigen::LevenbergMarquardtSpace::Running) {
+            auto cost = lm.fvec().squaredNorm();
+            std::cout << std::format("iteration {:02d} cost {:.3f}\n", iteration++, cost);
+        }
+    }
+
+    auto constexpr expected_norm {5.6427082397E+03};
+    std::array constexpr expected_x {1.2881396800E+03,
+                                     1.4910792535E+03,
+                                     5.8323836877E+02,
+                                     7.5416644291E+01,
+                                     9.6629502864E-01,
+                                     3.9797285797E-01,
+                                     4.9727297349E-02};
+
+    auto constexpr eps {1e-4};
+    boost::ut::expect(approximately_equal {eps}(lm.fvec().squaredNorm(), expected_norm));
+    for (auto i = 0; i < x.size(); ++i) {
+        boost::ut::expect(approximately_equal {eps}(x[i], expected_x.at(static_cast<std::size_t>(i))));
+    }
+
+    // try second starting point
+    auto s2 = thurber_functor::start2;
+    x = Eigen::Map<decltype(x) const>(s2.data(), std::ssize(s2));
+    lm.resetParameters();
+    lm.setMaxfev(max_fun_eval);  // NOLINT
+    lm.setFtol(tol);
+    lm.setXtol(tol);
+
+    std::cout << "starting optimization from x0 = " << x.transpose() << "\n";
+    iteration = 1;  // reset iteration
+    status = lm.minimizeInit(x);
+    if (status != Eigen::LevenbergMarquardtSpace::ImproperInputParameters) {
+        while ((status = lm.minimizeOneStep(x)) == Eigen::LevenbergMarquardtSpace::Running) {
+            auto cost = lm.fvec().squaredNorm();
+            std::cout << std::format("iteration {:02d} cost {:.3f}\n", iteration++, cost);
+        }
+    }
+
+    boost::ut::expect(approximately_equal {eps}(lm.fvec().squaredNorm(), expected_norm));
+    for (auto i = 0; i < x.size(); ++i) {
+        boost::ut::expect(approximately_equal {eps}(x[i], expected_x.at(static_cast<std::size_t>(i))));
+    }
+    return x;
+}
+
+boost::ut::suite const nonlinear_least_squares_test_suite = []() -> void
 {
     using namespace boost::ut;  // NOLINT
 
-    "thurber"_test = [&]
-    {
-        auto constexpr tol {1.E4 * std::numeric_limits<double>::epsilon()};
-        auto constexpr max_fun_eval {50};
-
-        // try first starting point
-        auto s1 = thurber_functor::start1;
-        Eigen::VectorXd x = Eigen::Map<decltype(x) const>(s1.data(), std::ssize(s1));
-
-        thurber_functor cost_function;
-        Eigen::LevenbergMarquardt<thurber_functor> lm(cost_function);
-        Eigen::LevenbergMarquardtSpace::Status status {};
-        lm.setMaxfev(max_fun_eval);
-        lm.setFtol(tol);
-        lm.setXtol(tol);
-        status = lm.minimize(x);
-
-        auto constexpr expected_norm {5.6427082397E+03};
-        std::array constexpr expected_x {1.2881396800E+03,
-                                         1.4910792535E+03,
-                                         5.8323836877E+02,
-                                         7.5416644291E+01,
-                                         9.6629502864E-01,
-                                         3.9797285797E-01,
-                                         4.9727297349E-02};
-
-        auto constexpr eps {1e-4};
-        expect(approximately_equal {eps}(lm.fvec().squaredNorm(), expected_norm));
-        for (auto i = 0; i < x.size(); ++i) {
-            expect(approximately_equal {eps}(x[i], expected_x.at(static_cast<std::size_t>(i))));
-        }
-
-        // try second starting point
-        auto s2 = thurber_functor::start2;
-        x = Eigen::Map<decltype(x) const>(s2.data(), std::ssize(s2));
-        lm.resetParameters();
-        lm.setMaxfev(max_fun_eval);  // NOLINT
-        lm.setFtol(tol);
-        lm.setXtol(tol);
-        status = lm.minimize(x);
-
-        expect(approximately_equal {eps}(lm.fvec().squaredNorm(), expected_norm));
-        for (auto i = 0; i < x.size(); ++i) {
-            expect(approximately_equal {eps}(x[i], expected_x.at(static_cast<std::size_t>(i))));
-        }
-    };
+    "thurber"_test = [&]() -> void { test_thurber(); };
 };
 
 }  // namespace reverse::test
