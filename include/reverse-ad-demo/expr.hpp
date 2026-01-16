@@ -11,10 +11,7 @@ namespace reverse
 {
 
 template<typename T>
-concept Arithmetic = requires
-{
-    std::is_arithmetic_v<T>;
-};
+concept Arithmetic = requires { std::is_arithmetic_v<T>; };
 
 template<Arithmetic T>
 struct Node

@@ -1,25 +1,33 @@
 #ifndef REVERSE_AD_DEMO_TEST_CORRECTNESS_HPP
 #define REVERSE_AD_DEMO_TEST_CORRECTNESS_HPP
 
+#include <iostream>
+
 #include "ext/boost/ut.hpp"
+
+template<>
+auto boost::ut::cfg<boost::ut::override> = ut::runner<ut::reporter<>> {};
+
+#include "reverse-ad-demo/dual.hpp"
 #include "reverse-ad-demo/expr.hpp"
 
 namespace reverse::test
 {
 
-boost::ut::suite const correctness_test_suite = []
+boost::ut::suite const correctness_test_suite = []() -> void
 {
     using namespace boost::ut;  // NOLINT
 
-    auto eq = [](auto a, auto b)
+    auto eq = [](auto a, auto b) -> auto
     {
         constexpr auto eps {1e-6};
         return std::abs(a - b) < eps;
     };
 
     using Tape = reverse::Tape<double>;
+    using Dual = forward::dual;
 
-    "x * y + sin(x) | x=0.5, y=4.2"_test = [&]
+    "x * y + sin(x) | x=0.5, y=4.2"_test = [&]() -> void
     {
         Tape tape;
 
@@ -37,6 +45,17 @@ boost::ut::suite const correctness_test_suite = []
         auto g = z.gradient();
         expect(eq(g.wrt(x), y.value + std::cos(x.value)));
         expect(eq(g.wrt(y), x.value));
+
+        std::array duals {Dual {0.5}, Dual {4.2}};
+        std::array gradient {0.0, 0.0};
+        for (auto i = 0; i < duals.size(); ++i) {
+            duals[i].b = 1;
+            auto c = duals[0] * duals[1] + duals[0].sin();
+            gradient[i] = c.b;
+            duals[i].b = 0;
+        }
+        expect(eq(gradient[0], y.value + std::cos(x.value)));
+        expect(eq(gradient[1], x.value));
     };
 
     "sin(x) + cos(y) | x=2, y=3"_test = [&]
