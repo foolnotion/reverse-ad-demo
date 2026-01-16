@@ -8,53 +8,63 @@
     foolnotion.url = "github:foolnotion/nur-pkg";
   };
 
-  outputs = { self, flake-utils, nixpkgs, foolnotion, pratt-parser }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      flake-utils,
+      nixpkgs,
+      foolnotion,
+      pratt-parser,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ foolnotion.overlay ];
         };
 
-        stdenv_ = pkgs.overrideCC pkgs.llvmPackages_15.stdenv (
-          pkgs.clang_15.override { gccForLibs = pkgs.gcc12.cc; }
-        );
-
-      in rec {
-        devShells.default = stdenv_.mkDerivation {
+      in
+      rec {
+        devShells.default = pkgs.llvmPackages_latest.stdenv.mkDerivation {
           name = "reverse-ad";
 
-          nativeBuildInputs = with pkgs; [
-            cmake
-            ninja
-            clang-tools
-            codespell
-            cppcheck
-            include-what-you-use
-            gcc12
-          ];
+          nativeBuildInputs =
+            with pkgs;
+            [
+              cmake
+              ninja
+              clang-tools
+              codespell
+              cppcheck
+              include-what-you-use
+            ]
+            ++ pkgs.lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [ pkgs.gcc15 ];
 
-          buildInputs = with pkgs; [
-            # dependencies
-            eigen
-            xxhash_cpp
-            unordered_dense
-
-            # debugging and profiling
-            gdb
-            graphviz
-            hotspot
-            hyperfine
-            linuxPackages.perf
-            pyprof2calltree
-            qcachegrind
-            seer
-            valgrind
-          ];
+          buildInputs =
+            with pkgs;
+            [
+              # dependencies
+              eigen
+              xxhash_cpp
+              unordered_dense
+            ]
+            ++ pkgs.lib.optionals (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
+              # debugging and profiling
+              gdb
+              graphviz
+              hotspot
+              hyperfine
+              perf
+              pyprof2calltree
+              seer
+              valgrind
+            ];
 
           shellHook = ''
             alias bb="cmake --build build -j"
           '';
         };
-      });
+      }
+    );
 }
